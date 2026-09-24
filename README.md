@@ -2,6 +2,8 @@
 
 CCC is a small workflow for using Claude Code and Codex on one code change. One agent plans, one agent implements, and each reviews the other at the handoff points. You run CCC from whichever agent session you want as the coordinator.
 
+CCC reduces coordination tokens with finding IDs, delta handoffs between rounds, and per-stage protocol snapshots. Caveman-style prose compression is available as an opt-in (`caveman=lite|full|ultra`); the default `caveman=off` keeps normal prose for maximum plan and code quality.
+
 ## What It Is / When To Use
 
 A file-based protocol for making one incremental change safer through structured cross-review. Not a general autonomous agent, a repo-wide project manager, or a multi-agent framework.
@@ -39,12 +41,14 @@ codex login
 claude         # then /login
 ```
 
-Install the five skills (`ccc`, `ccc-plan`, `ccc-plan-review`, `ccc-code`, `ccc-code-review`):
+Install the five skills (`ccc`, `ccc-plan`, `ccc-plan-review`, `ccc-code`, `ccc-code-review`) plus the pinned [caveman](https://github.com/JuliusBrussee/caveman) style skill used by opt-in caveman runs:
 
 ```text
 scripts/ccc-install.sh                      # symlink into ~/.claude/skills
 scripts/ccc-install.sh --copy               # checkout-independent copy
 scripts/ccc-install.sh --dest DIR --force   # another skills dir, replacing existing
+scripts/ccc-install.sh --no-caveman         # skip caveman
+scripts/ccc-install.sh --caveman-src FILE   # offline: local caveman SKILL.md (hash still checked)
 ```
 
 After install, the coordinator is available as `/ccc` in Claude Code or `$ccc` in Codex.
@@ -75,10 +79,10 @@ $ccc .ccc/runs/auth-fix "Given the context above, implement the auth fix"
 Syntax:
 
 ```text
-/ccc <output_folder> "<task>" [pN-cM] [manual|normal|auto] [plan-code=<planner>-<coder>]
+/ccc <output_folder> "<task>" [pN-cM] [manual|normal|auto] [plan-code=<planner>-<coder>] [caveman=off|lite|full|ultra]
 ```
 
-Defaults: `plan-code=claude-codex`, `p2-c2`, `normal`. The default run means: Claude plans, Codex reviews the plan, Codex implements, Claude reviews the code. The split is intentional — the coder critiques whether the plan is executable before implementing it, and the planner later checks whether the implementation matches the plan.
+Defaults: `plan-code=claude-codex`, `p2-c2`, `normal`, `caveman=off`. The default run means: Claude plans, Codex reviews the plan, Codex implements, Claude reviews the code. The split is intentional — the coder critiques whether the plan is executable before implementing it, and the planner later checks whether the implementation matches the plan.
 
 Resume or cancel:
 

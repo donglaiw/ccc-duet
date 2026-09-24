@@ -126,6 +126,15 @@ def parse_run_md() -> tuple[str, str, dict]:
         err("run.md: Runtime session_detected must be claude, codex, or unknown")
     if plan_code_source not in {"explicit", "env", "default", "persisted"}:
         err("run.md: Runtime plan_code_source must be explicit, env, default, or persisted")
+    caveman = runtime.get("caveman")
+    caveman_source = runtime.get("caveman_source")
+    if caveman is not None:
+        if caveman not in {"off", "lite", "full", "ultra"}:
+            err("run.md: Runtime caveman must be off, lite, full, or ultra")
+        if caveman_source not in {"explicit", "env", "default", "persisted"}:
+            err("run.md: Runtime caveman_source must be explicit, env, default, or persisted")
+    elif caveman_source is not None:
+        err("run.md: Runtime caveman_source requires caveman")
 
     rounds = key_values(section(text, "Rounds"))
     for key in ("plan_rounds", "revision_rounds"):

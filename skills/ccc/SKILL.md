@@ -6,25 +6,25 @@ description: Coordinate the CCC single-session workflow using configurable plann
 
 Use this skill to coordinate a CCC run from the current session. `plan-code=<planner>-<coder>` selects who owns planning and implementation.
 
-Before doing anything else, resolve `<CCC_HOME>` (below) and read `<CCC_HOME>/protocol/CCC_PROTOCOL.md`. It is the canonical source for syntax, roles, rounds, artifact contracts, validation, resume behavior, cancel behavior, and final output.
+Before action, resolve `<CCC_HOME>` and read `<CCC_HOME>/protocol/CCC_PROTOCOL.md`; record `ccc_home` and optional `protocol_sha256`. In-session stages may use that same full read; subprocesses receive embedded snapshots.
 
 ## CCC Home
 
-`<CCC_HOME>` is the directory that ships the CCC protocol and scripts. It is not the target repository and not the current working directory. Resolve it once per run, in order:
+`<CCC_HOME>` ships the protocol and scripts; it is not the target repository. Resolve it once per run:
 
-1. `$CCC_HOME`, when set and `$CCC_HOME/protocol/CCC_PROTOCOL.md` exists.
-2. This skill's own directory, which ships `protocol/` and `scripts/` (for example `~/.claude/skills/ccc/protocol/CCC_PROTOCOL.md`).
-3. A `ccc-duet` checkout root that contains `protocol/CCC_PROTOCOL.md`.
+1. `$CCC_HOME`, when set and its protocol exists.
+2. This skill's own directory.
+3. A `ccc-duet` checkout containing the protocol.
 
 If none resolves, the install is incomplete: stop with `Status: blocked`, report the paths tried, and point at `<CCC_HOME>/scripts/ccc-install.sh`. Never reconstruct the protocol from memory. Record the resolved path in `## Runtime` as `ccc_home:`.
 
 ## Coordinator Checklist
 
-1. Parse the requested CCC action: default start, `resume`, or `cancel`, optional mode `manual`, `normal`, or `auto`, optional `plan-code=<planner>-<coder>`, and optional rounds `pN-cM`; mode is not persisted and `resume` defaults to `normal`.
+1. Parse the requested CCC action: default start, `resume`, or `cancel`, optional mode `manual`, `normal`, or `auto`, optional `plan-code=<planner>-<coder>`, optional `caveman=off|lite|full|ultra`, and optional rounds `pN-cM`; mode is not persisted and `resume` defaults to `normal`.
 2. Resolve the explicit output folder.
 3. Create the run folder, `artifacts/`, and `state/` if needed.
 4. Run `<CCC_HOME>/scripts/ccc-detect-session.sh` and record `session_detected`; the current session remains the coordinator.
-5. Resolve `plan-code`, defaulting to `claude-codex`; explicit `plan-code=...` wins, then `CCC_PLAN_CODE`, then default.
+5. Resolve `plan-code`, defaulting to `claude-codex`; explicit `plan-code=...` wins, then `CCC_PLAN_CODE`, then default. Resolve `caveman`: explicit `caveman=...` wins; else on resume the persisted value; else on start `CCC_CAVEMAN`; else `off`; record `caveman:` and `caveman_source:` in `## Runtime`. If the level is not `off`, resolve the caveman `SKILL.md` per the protocol `## Caveman Mode` or initialize the run as blocked.
 6. For a new start, confirm required companion CLIs exit successfully, using `<CCC_HOME>/scripts/ccc-check-agent-cli.sh <agent>` when practical, or initialize the run as blocked.
 7. For a new start, write `task.md` and initialize `run.md`, including `## Runtime` and the git baseline required by the protocol.
 8. Determine the next stage from `.done` files and artifact verdicts.
@@ -41,8 +41,11 @@ Stages owned by the other agent are automatic shell commands:
 
 ```text
 1. Build the review prompt from the protocol template.
-2. Run the configured owner command from the repository root.
-3. For review stages, write the CCC review artifact as an attested summary of the raw output.
+2. Embed protocol snapshots from ccc-protocol-sections.sh; fail on extraction error.
+3. Write exact UTF-8 prompt bytes to state/<stage>.prompt.bytes; enforce the byte ceiling.
+4. For code review, capture ccc-untracked.sh --manifest and tracked/staged diffs before and after the owner command; block on mutation or script error.
+5. Run the configured owner command from the repository root.
+6. For review stages, write the CCC review artifact as an attested summary of the raw output.
 ```
 
 For plan reviews, use `state/plan_vN_review.review.raw.md`.

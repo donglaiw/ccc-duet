@@ -20,6 +20,8 @@ jobs:
           bash -n scripts/ccc-check-agent-cli.sh
           bash -n scripts/ccc-install.sh
           bash -n scripts/ccc-check-install.sh
+          bash -n scripts/ccc-protocol-sections.sh
+          bash -n scripts/ccc-untracked.sh
           scripts/ccc-validate.sh examples/runs/hello-world
           scripts/ccc-validate.sh examples/runs/hello-world-codex-session
           scripts/ccc-validate.sh examples/runs/hello-world-auto-override
@@ -33,4 +35,8 @@ jobs:
           scripts/ccc-install.sh --dest "$RUNNER_TEMP/skills-copy" --copy
           # A copied install must not depend on the checkout staying put.
           mv "$RUNNER_TEMP/skills-copy" "$RUNNER_TEMP/skills-copy-moved"
-          scripts/ccc-check-install.sh "$RUNNER_TEMP/skills-copy-moved"
+          scripts/ccc-check-install.sh "$RUNNER_TEMP/skills-copy-moved" | tee "$RUNNER_TEMP/check.txt"
+          # The pinned caveman skill must install and verify.
+          grep -q "^caveman: pinned " "$RUNNER_TEMP/check.txt"
+          scripts/ccc-install.sh --dest "$RUNNER_TEMP/skills-nocave" --no-caveman
+          test ! -e "$RUNNER_TEMP/skills-nocave/caveman"

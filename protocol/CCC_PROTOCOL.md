@@ -6,6 +6,44 @@ CCC is a single-session coordinator workflow for one incremental code change. Th
 
 Do not use `.ccc/current_run`; the output folder is always explicit.
 
+## Finding IDs
+
+Every actionable review concern has an ID: plan findings `P1..`, code findings `C1..`, questions `Q1..`, unique per artifact. Cross-version references use `<stage>:<id>` (for example `review_v0:C2`). The next version's `Changes Since ...` section answers each prior ID once as `fixed`, `rejected`, or `deferred`, with a reason, and answers questions inline. Required empty sections say `none`. IDs are structure, not compression; they apply in every caveman level, including `off`.
+
+## Caveman Mode
+
+Caveman mode is an **opt-in** compression level for agent-facing text. The default is `caveman=off`: every stage writes normal, complete prose, which favors plan and code quality over token savings. Compressed prose may degrade reasoning or drop nuance, so enable it deliberately.
+
+Levels:
+
+```text
+off    default; normal prose everywhere
+lite   caveman lite: no filler or hedging; articles and full sentences kept
+full   caveman full: articles dropped, fragments allowed
+ultra  caveman ultra: maximal compression
+```
+
+Wenyan levels are not supported: cross-agent artifacts must stay in the run's working language.
+
+The style rules come from the `caveman` skill (upstream `JuliusBrussee/caveman`, `skills/caveman/SKILL.md`), which `<CCC_HOME>/scripts/ccc-install.sh` installs pinned by commit and SHA-256. Resolve its `SKILL.md` in this order: `$CCC_CAVEMAN_SKILL`; `caveman/SKILL.md` next to the installed `ccc` skill directory; `~/.claude/skills/caveman/SKILL.md`. If a level other than `off` is selected and none resolves, the run is blocked at start; do not improvise caveman rules from memory.
+
+When the level is not `off`:
+
+* Scope: `plan_vN.md`, `plan_vN_review.md`, `code_vN.md`, `review_vN.md`, cross-agent prompts, and reviewer replies. This intentionally overrides the caveman skill's own "persisted outside chat stays normal prose" boundary for these CCC files only.
+* Out of scope, always normal prose: `task.md`, `run.md`, raw transcripts (kept verbatim), code, code comments, repository docs, commit text, and every message to the user.
+* Never compress away: headings, `VERDICT` lines, required literals (`Initial plan.`, `Initial implementation.`, baseline keys), paths, commands, code, identifiers, numbers, error text, finding severity and content, verification commands and outcomes, risks, and blockers. The caveman skill's auto-clarity rules apply; when compression creates ambiguity, write normally.
+* In-session stages load the resolved caveman skill at the selected level. Cross-agent prompts embed the resolved `SKILL.md` text plus one line: `Caveman level: <level>. Apply only to your reply/artifact text; never to code.`
+
+Selection precedence:
+
+```text
+1. caveman=<level> in the command.
+2. Else CCC_CAVEMAN, when it is a valid level.
+3. Else off.
+```
+
+The level is persisted in `run.md` `## Runtime` as `caveman:` with `caveman_source: explicit|env|default|persisted`. A missing `caveman:` line means `off`. `/ccc resume` reuses the persisted level unless an explicit `caveman=<level>` replaces it.
+
 ## CCC Home
 
 `<CCC_HOME>` is the directory that ships this protocol and the CCC scripts. It is **not** the target repository, and it is not the current working directory. Every skill resolves it before doing anything else, in this order:
@@ -64,8 +102,8 @@ CCC uses non-interactive companion calls. It must not ask the user to run `/code
 ## Syntax
 
 ```text
-/ccc <output_folder> "<task>" [pN-cM] [manual|normal|auto] [plan-code=<planner>-<coder>]
-/ccc resume <output_folder> [manual|normal|auto] [plan-code=<planner>-<coder>]
+/ccc <output_folder> "<task>" [pN-cM] [manual|normal|auto] [plan-code=<planner>-<coder>] [caveman=off|lite|full|ultra]
+/ccc resume <output_folder> [manual|normal|auto] [plan-code=<planner>-<coder>] [caveman=off|lite|full|ultra]
 /ccc cancel <output_folder> "<reason>"
 ```
 
@@ -88,6 +126,7 @@ Argument defaults:
 plan-code  claude-codex
 rounds     p2-c2
 mode       normal
+caveman    off
 ```
 
 `pN-cM` is the required rounds syntax. It means:
@@ -223,7 +262,10 @@ coder: <claude|codex>
 plan_code: <claude-codex|codex-claude|claude-claude|codex-codex>
 session_detected: <claude|codex|unknown>
 plan_code_source: <explicit|env|default|persisted>
+caveman: <off|lite|full|ultra>              # optional; absent means off
+caveman_source: <explicit|env|default|persisted>  # required when caveman is present
 ccc_home: <absolute path>          # optional provenance
+protocol_sha256: <sha256>          # optional snapshot provenance
 ```
 
 `plan_code` must equal `<planner>-<coder>`.
@@ -352,30 +394,59 @@ The CCC review artifact is an attested summary of the raw reviewer output, not a
 
 Reviewer prose cannot promote a finding to hard-failure status. Hard failures are detected only by coordinator-side checks.
 
+Every review prompt ends with this compact reply contract:
+
+```text
+READY: yes|no
+<ID> [major|minor] <loc> — <problem> — <fix>
+Q<n> <question>
+```
+
+Nothing else. Unparseable output -> clarification or block. Prompts use stable order: static rules + protocol snapshots, task, current artifacts, diffs last. For v1+, include task, full current artifact, and prior review Findings/Questions/VERDICT; omit prior plan/code artifact. Code reviews still include the full current diff against baseline. Log exact stdin UTF-8 bytes at `state/<stage>.prompt.bytes` before the ceiling check.
+
+Protocol snapshots come from `<CCC_HOME>/scripts/ccc-protocol-sections.sh <protocol> <Section>...`; failure is a hard failure. Stage inputs:
+
+| Stage | Embedded sections |
+|---|---|
+| plan_vN | Finding IDs, Artifact Contracts |
+| plan_vN_review | Finding IDs, Review Prompt Contract, Verdicts |
+| code_vN | Finding IDs, Artifact Contracts, Git Review Baseline |
+| review_vN | Finding IDs, Review Prompt Contract, Verdicts, Git Review Baseline |
+
+When `caveman` is not `off`, also embed `Caveman Mode` and the resolved caveman `SKILL.md`.
+
+Reviewers do not receive Artifact Contracts; they reply in the compact format above. The coordinator reads the full protocol once per invocation, may record its hash, and writes the attested artifact.
+
 ## Git Review Baseline
 
 Driver commits during a run are not allowed. The intended review surface is the working tree relative to `run_start_ref`.
 
 When `run_start_ref_kind` is `head`, confirm `git rev-parse HEAD` equals `run_start_ref` before any code-review command. If `HEAD` has moved, stop with `Status: blocked`; recover by restoring `HEAD` to `run_start_ref`, or cancel and start a new run.
 
-Use these git outputs in code-review prompts:
+For `head` mode, first verify `HEAD == run_start_ref`; do not include triple-dot stat/diff output after that check. Use these git outputs in code-review prompts, applying pathspec exclusions when the run folder is inside the repository:
 
 ```text
-git status --short
-git diff --stat <run_start_ref>...HEAD
-git diff <run_start_ref>...HEAD
-git diff --cached
-git diff
+git status --short -- . ':(exclude)<output_folder>'
+git diff --cached -- . ':(exclude)<output_folder>'
+git diff -- . ':(exclude)<output_folder>'
 ```
+
+Include `<CCC_HOME>/scripts/ccc-untracked.sh <repo_root> <output_folder> --prompt` in every code-review prompt. It lists non-ignored untracked files, excluding the run folder, with JSON-safe paths and text/binary/symlink/other content. Its `--manifest` output is a mutation guard captured immediately before and after the reviewer call:
+
+```text
+<sha256|-> <size> <octal st_mode> <kind> <json-path>
+```
+
+Hash regular-file bytes and symlink target bytes; `st_mode` includes file type and permission bits. Any manifest difference, including chmod or type changes, blocks. Script errors block. Hashing has no size cap; prompt size remains bounded by `CCC_REVIEW_PROMPT_MAX_BYTES`. Empty-tree mode uses the same untracked block and exclusions, with the baseline diff commands below.
 
 When `run_start_ref_kind` is `empty_tree`, compare the empty tree to `HEAD` without triple-dot merge-base syntax:
 
 ```text
-git status --short
-git diff --stat 4b825dc642cb6eb9a060e54bf8d69288fbee4904 HEAD
-git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904 HEAD
-git diff --cached
-git diff
+git status --short -- . ':(exclude)<output_folder>'
+git diff --stat 4b825dc642cb6eb9a060e54bf8d69288fbee4904 HEAD -- . ':(exclude)<output_folder>'
+git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904 HEAD -- . ':(exclude)<output_folder>'
+git diff --cached -- . ':(exclude)<output_folder>'
+git diff -- . ':(exclude)<output_folder>'
 ```
 
 To guard tracked and staged repository content, capture `git diff` and `git diff --cached` immediately before and after any code-review command. If the before/after outputs differ, stop with `Status: blocked`, report the mutation diff to the user, and require the user to restore or stash those changes before resuming.
@@ -478,6 +549,8 @@ current_head: <sha|none>
 ```
 
 `code_v0.md` must write `Initial implementation.` in `Changes Since Previous Code Version`.
+
+Review artifacts are faithful indexes: `## Summary` is at most three lines including counts and raw path; `## Findings` has one line per ID and preserves severity/content. Use `none` for an empty required section.
 
 `review_vN.md` required sections:
 

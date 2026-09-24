@@ -4,11 +4,11 @@ description: CCC plan review stage. The configured coder reviews plan_vN.md and 
 ---
 # Skill: CCC Plan Review
 
-Use this skill only inside a CCC run. Read `<CCC_HOME>/protocol/CCC_PROTOCOL.md` first and follow its artifact contract for `plan_vN_review.md`.
+Use only in CCC. Read `<CCC_HOME>/protocol/CCC_PROTOCOL.md`; coordinator full read satisfies an in-session stage in the same invocation. Standalone -> read fully. Follow its artifact contract.
 
 ## CCC Home
 
-This skill ships the protocol next to itself. Resolve `<CCC_HOME>` before reading anything else: `$CCC_HOME` when set, otherwise this skill's own directory, otherwise a `ccc-duet` checkout root — whichever first contains `protocol/CCC_PROTOCOL.md`. If none resolves, stop as blocked and report the broken install; never reconstruct the protocol or a prompt template from memory. `<CCC_HOME>` is not the target repository — companion CLI calls still run from the target repository root.
+Resolve `$CCC_HOME`, then this skill's own directory, then a `ccc-duet` checkout containing the protocol; if none resolves, stop blocked and report paths. `<CCC_HOME>` is not the target repository; see protocol `## CCC Home`.
 
 ## Inputs
 
@@ -39,10 +39,10 @@ Do not write `.done`.
 * If the coder is the current session's agent, perform the review directly.
 * If the coder is `codex`, run `codex exec --sandbox read-only --output-last-message <RUN>/state/plan_vN_review.review.raw.md -` from the repository root.
 * If the coder is `claude`, run `claude --print --output-format text --no-session-persistence --tools ""` from the repository root and capture stdout to `state/plan_vN_review.review.raw.md`.
-* In all configurations, include the complete required artifacts in the prompt. Compute the UTF-8 byte length of the exact reviewer stdin payload. If it would exceed `CCC_REVIEW_PROMPT_MAX_BYTES` (default `200000`), stop as blocked instead of silently truncating.
+* Include embedded protocol snapshot, exact byte log, caveman embedding when the run level is not `off`, compact reply contract, and complete required artifacts; v1+ uses delta handoff. If over `CCC_REVIEW_PROMPT_MAX_BYTES`, block.
 * Use the plan-review prompt template from `<CCC_HOME>/protocol/CCC_PROTOCOL.md`.
 * Tell the reviewer to evaluate only the artifacts and text included in the prompt, without inspecting other repository files.
-* Ask the reviewer for findings tagged `[minor]` or `[major]`, questions, and whether the plan appears ready for implementation.
+* Tell reviewer: no edits; inspect only included text; emit only `READY`, finding IDs, and questions tagged `[minor]`/`[major]`.
 * Do not let the reviewer edit code during plan review.
 * Save the raw reviewer output to `state/plan_vN_review.review.raw.md` before writing the review artifact.
 * Preserve reviewer findings faithfully when writing the artifact.

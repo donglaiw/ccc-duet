@@ -4,11 +4,11 @@ description: CCC planning stage. The configured planner writes or revises plan_v
 ---
 # Skill: CCC Plan
 
-Use this skill only inside a CCC run. Read `<CCC_HOME>/protocol/CCC_PROTOCOL.md` first and follow its artifact contract for `plan_vN.md`.
+Use only in CCC. Read `<CCC_HOME>/protocol/CCC_PROTOCOL.md`; coordinator full read satisfies an in-session stage in the same invocation. Standalone -> read fully. Follow its artifact contract.
 
 ## CCC Home
 
-This skill ships the protocol next to itself. Resolve `<CCC_HOME>` before reading anything else: `$CCC_HOME` when set, otherwise this skill's own directory, otherwise a `ccc-duet` checkout root — whichever first contains `protocol/CCC_PROTOCOL.md`. If none resolves, stop as blocked and report the broken install; never reconstruct the protocol or a prompt template from memory. `<CCC_HOME>` is not the target repository — companion CLI calls still run from the target repository root.
+Resolve `$CCC_HOME`, then this skill's own directory, then a `ccc-duet` checkout containing the protocol; if none resolves, stop blocked and report paths. `<CCC_HOME>` is not the target repository; see protocol `## CCC Home`.
 
 ## Inputs
 
@@ -36,7 +36,7 @@ Do not write `.done`.
 
 ## Rules
 
-* Do not edit code during planning.
+* Do not edit code during planning. Follow the run's caveman level (`run.md` `caveman:`; absent or `off` = normal prose). Include concrete verification and answer every prior ID once in `Changes Since Previous Plan Version`.
 * The configured planner owns this stage.
 * Keep the plan scoped to the task.
 * For `plan_v1+`, directly address the prior plan review findings in `Changes Since Previous Plan Version`.

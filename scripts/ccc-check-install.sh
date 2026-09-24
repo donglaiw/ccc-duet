@@ -8,7 +8,7 @@ set -euo pipefail
 CCC_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET="${1:-$CCC_ROOT/skills}"
 SKILLS=(ccc ccc-plan ccc-plan-review ccc-code ccc-code-review)
-REQUIRED_SCRIPTS=(ccc-detect-session.sh ccc-check-agent-cli.sh ccc-validate.sh ccc-install.sh ccc-check-install.sh)
+REQUIRED_SCRIPTS=(ccc-detect-session.sh ccc-check-agent-cli.sh ccc-validate.sh ccc-install.sh ccc-check-install.sh ccc-protocol-sections.sh ccc-untracked.sh)
 errors=0
 
 err() { echo "ccc-check-install: $*" >&2; errors=$((errors + 1)); }
@@ -57,6 +57,23 @@ for skill in "${SKILLS[@]}"; do
     fi
   fi
 done
+
+# Caveman is optional (runs default to caveman=off). Report it; a pinned copy
+# whose bytes no longer match its pin is an error.
+cave="$TARGET/caveman"
+if [ -f "$cave/SKILL.md" ]; then
+  if [ -f "$cave/.ccc-pin" ]; then
+    want="$(awk '/^sha256: /{print $2}' "$cave/.ccc-pin")"
+    if command -v sha256sum >/dev/null 2>&1; then got="$(sha256sum "$cave/SKILL.md" | awk '{print $1}')"
+    else got="$(shasum -a 256 "$cave/SKILL.md" | awk '{print $1}')"; fi
+    [ "$got" = "$want" ] || err "caveman: SKILL.md does not match .ccc-pin sha256"
+    echo "caveman: pinned $(awk '/^ref: /{print $2}' "$cave/.ccc-pin")"
+  else
+    echo "caveman: present (not installed by CCC; unpinned)"
+  fi
+else
+  echo "caveman: not installed (optional; needed only for caveman=lite|full|ultra)"
+fi
 
 if [ "$errors" -ne 0 ]; then
   echo "ccc-check-install: $errors problem(s) in $TARGET" >&2

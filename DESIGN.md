@@ -22,6 +22,7 @@ Optional arguments may appear in any order.
 | `plan-code=...` | `claude-codex`, `codex-claude`, `claude-claude`, `codex-codex` | `plan-code=claude-codex` |
 | rounds | `p1-c1`, `p2-c2`, `p3-c2`, etc. | `p2-c2` |
 | mode | `manual`, `normal`, `auto` | `normal` |
+| `caveman=...` | `off`, `lite`, `full`, `ultra` | `caveman=off` |
 
 Stages owned by the current coordinator session run directly. Stages owned by the other agent use a CLI subprocess and consume prompt budget.
 
@@ -70,6 +71,8 @@ When `<CCC_HOME>` cannot be resolved, CCC stops as `blocked`. It does not recons
 |---|---|---|
 | `CCC_PLAN_CODE` | `claude-codex`, `codex-claude`, `claude-claude`, `codex-codex` | Default stage assignment when `plan-code=...` is omitted. |
 | `CCC_REVIEW_PROMPT_MAX_BYTES` | integer byte limit | Maximum UTF-8 byte length of a cross-agent review prompt. Default: `200000`. |
+| `CCC_CAVEMAN` | `off`, `lite`, `full`, `ultra` | Default caveman level when `caveman=...` is omitted on a new run. |
+| `CCC_CAVEMAN_SKILL` | absolute path | caveman `SKILL.md` to use instead of the installed one. |
 | `CCC_HOME` | absolute path | Directory holding `protocol/CCC_PROTOCOL.md` and `scripts/`. Overrides skill-directory resolution; useful when the skills are installed as copies but you want them to track a checkout. |
 
 Values are case-sensitive. Invalid values are treated as absent.
@@ -114,6 +117,16 @@ state/review_vN.review.raw.md
 This symmetry is a tradeoff: the reviewer does not independently re-derive the whole changeset. Review integrity depends on the coordinator assembling the prompt faithfully, preserving the raw transcript, and using the pre/post git-diff mutation guard around code review commands.
 
 CCC blocks instead of silently truncating when the UTF-8 byte length of the full stdin payload exceeds `CCC_REVIEW_PROMPT_MAX_BYTES`.
+
+## Token Efficiency
+
+Most savings are structural and always on: finding and question IDs make review handoffs addressable, later rounds send the current artifact plus the prior review's findings instead of whole prior versions, cross-agent prompts embed only the protocol sections a stage needs (`scripts/ccc-protocol-sections.sh`, with a `protocol_sha256`), prompts put stable content first for provider prompt caching, and `state/<stage>.prompt.bytes` makes the cost measurable.
+
+Prose compression is **opt-in**. `caveman=lite|full|ultra` applies the [caveman](https://github.com/JuliusBrussee/caveman) skill to plan, code-summary, and review artifacts, cross-agent prompts, and reviewer replies. The default is `caveman=off` because compressed prose can degrade model reasoning and drop nuance, and CCC optimizes for plan and code quality first. Raw transcripts, `task.md`, `run.md`, code, comments, repository docs, and messages to the user are never compressed. Caveman's own guidance keeps persisted files in normal prose; CCC deliberately overrides that only for its own agent-to-agent artifacts, and only when a run opts in.
+
+`scripts/ccc-install.sh` installs caveman's `skills/caveman/SKILL.md` pinned by commit and SHA-256 and writes a `.ccc-pin` record; `scripts/ccc-check-install.sh` reports it and flags a modified pinned copy. A failed download only warns, since `caveman=off` runs do not need it; a run that asks for a level without the skill blocks at start. Bumping the pin means reviewing upstream and updating `CAVEMAN_REF` and `CAVEMAN_SHA256` together.
+
+Code reviews also include a deterministic untracked-file block (`scripts/ccc-untracked.sh`); its manifest (SHA, size, `st_mode`, kind) is compared before and after the reviewer runs, so content, permission, or type changes to new files block the run.
 
 ## Rules
 

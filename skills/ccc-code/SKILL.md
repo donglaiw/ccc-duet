@@ -4,11 +4,11 @@ description: CCC code stage. The configured coder implements or revises code_vN.
 ---
 # Skill: CCC Code
 
-Use this skill only inside a CCC run. Read `<CCC_HOME>/protocol/CCC_PROTOCOL.md` first and follow its artifact contract for `code_vN.md`.
+Use only in CCC. Read `<CCC_HOME>/protocol/CCC_PROTOCOL.md`; the coordinator's full read satisfies this for an in-session stage in the same invocation. Standalone -> read it fully. Follow its artifact contract.
 
 ## CCC Home
 
-This skill ships the protocol next to itself. Resolve `<CCC_HOME>` before reading anything else: `$CCC_HOME` when set, otherwise this skill's own directory, otherwise a `ccc-duet` checkout root — whichever first contains `protocol/CCC_PROTOCOL.md`. If none resolves, stop as blocked and report the broken install; never reconstruct the protocol or a prompt template from memory. `<CCC_HOME>` is not the target repository — companion CLI calls still run from the target repository root.
+Resolve `$CCC_HOME`, then this skill's own directory, then a `ccc-duet` checkout containing the protocol; if none resolves, stop blocked and report paths. `<CCC_HOME>` is not the target repository; see protocol `## CCC Home`.
 
 ## Inputs
 
@@ -21,7 +21,7 @@ For `code_v0`:
 <RUN>/artifacts/plan_vN_review.md
 ```
 
-For `code_v1+`:
+For `code_v1+` (delta handoff; answer every prior finding/question ID once):
 
 ```text
 <RUN>/task.md
@@ -40,8 +40,8 @@ Do not write `.done`.
 
 ## Rules
 
-* `code_v0` means implement, verify, and summarize.
-* `code_v1+` means triage the previous review, fix accepted findings, verify, and summarize.
+* Implement, verify, summarize actual diff; follow the run's caveman level for `code_vN.md` (absent or `off` = normal prose); never compress code or comments.
+* Keep required headings, baseline keys, and `Initial implementation.` verbatim for v0.
 * The configured coder owns this stage.
 * Include the protocol-defined git baseline in `code_vN.md`.
 * Do not create git commits during a CCC run.

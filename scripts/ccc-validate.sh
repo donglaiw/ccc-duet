@@ -280,6 +280,13 @@ def validate_artifact(path: Path, run_start_ref: str) -> None:
         baseline = key_values(section(text, "Diff Baseline"))
         if baseline.get("run_start_ref") != run_start_ref:
             err(f"{path}: Diff Baseline run_start_ref must match run.md")
+        diff_mode = baseline.get("diff_mode")
+        unreviewed = baseline.get("unreviewed")
+        if diff_mode is not None and diff_mode not in {"full", "tiered"}:
+            err(f"{path}: Diff Baseline diff_mode must be full or tiered")
+        approvals = {"VERDICT: APPROVE", "VERDICT: APPROVE_WITH_MINOR_COMMENTS", "VERDICT: APPROVE_AUTO_OVERRIDE"}
+        if unreviewed not in (None, "", "none") and approvals & set(text.splitlines()):
+            err(f"{path}: unreviewed source/test files forbid approval verdicts")
 
 
 def validate_done_file(path: Path) -> None:

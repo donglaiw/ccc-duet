@@ -43,7 +43,7 @@ Stages owned by the other agent are automatic shell commands:
 1. Build the review prompt from the protocol template.
 2. Embed protocol snapshots from ccc-protocol-sections.sh; fail on extraction error.
 3. Write exact UTF-8 prompt bytes to state/<stage>.prompt.bytes; enforce the byte ceiling.
-4. For code review, capture ccc-untracked.sh --manifest and tracked/staged diffs before and after the owner command; block on mutation or script error.
+4. For code review, build the diff block with ccc-diff-summary.sh (protocol `## Review Diff Budget`); in `tiered` mode serve `NEED` lines with at most one follow-up call. Capture ccc-untracked.sh --manifest and tracked/staged diffs before and after the owner command; block on mutation or script error.
 5. Run the configured owner command from the repository root.
 6. For review stages, write the CCC review artifact as an attested summary of the raw output.
 ```

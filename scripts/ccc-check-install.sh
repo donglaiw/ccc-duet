@@ -8,7 +8,7 @@ set -euo pipefail
 CCC_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET="${1:-$CCC_ROOT/skills}"
 SKILLS=(ccc ccc-plan ccc-plan-review ccc-code ccc-code-review)
-REQUIRED_SCRIPTS=(ccc-detect-session.sh ccc-check-agent-cli.sh ccc-validate.sh ccc-install.sh ccc-check-install.sh ccc-protocol-sections.sh ccc-untracked.sh)
+REQUIRED_SCRIPTS=(ccc-detect-session.sh ccc-check-agent-cli.sh ccc-validate.sh ccc-install.sh ccc-check-install.sh ccc-protocol-sections.sh ccc-untracked.sh ccc-diff-summary.sh)
 errors=0
 
 err() { echo "ccc-check-install: $*" >&2; errors=$((errors + 1)); }

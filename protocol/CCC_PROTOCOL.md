@@ -400,6 +400,8 @@ Every review prompt ends with this compact reply contract:
 READY: yes|no
 <ID> [major|minor] <loc> — <problem> — <fix>
 Q<n> <question>
+NEED <json-path>          (tiered code review only)
+SKIP <json-path> — <reason>   (tiered code review only)
 ```
 
 Nothing else. Unparseable output -> clarification or block. Prompts use stable order: static rules + protocol snapshots, task, current artifacts, diffs last. For v1+, include task, full current artifact, and prior review Findings/Questions/VERDICT; omit prior plan/code artifact. Code reviews still include the full current diff against baseline. Log exact stdin UTF-8 bytes at `state/<stage>.prompt.bytes` before the ceiling check.
@@ -411,7 +413,7 @@ Protocol snapshots come from `<CCC_HOME>/scripts/ccc-protocol-sections.sh <proto
 | plan_vN | Finding IDs, Artifact Contracts |
 | plan_vN_review | Finding IDs, Review Prompt Contract, Verdicts |
 | code_vN | Finding IDs, Artifact Contracts, Git Review Baseline |
-| review_vN | Finding IDs, Review Prompt Contract, Verdicts, Git Review Baseline |
+| review_vN | Finding IDs, Review Prompt Contract, Verdicts, Git Review Baseline, Review Diff Budget |
 
 When `caveman` is not `off`, also embed `Caveman Mode` and the resolved caveman `SKILL.md`.
 
@@ -431,7 +433,7 @@ git diff --cached -- . ':(exclude)<output_folder>'
 git diff -- . ':(exclude)<output_folder>'
 ```
 
-Include `<CCC_HOME>/scripts/ccc-untracked.sh <repo_root> <output_folder> --prompt` in every code-review prompt. It lists non-ignored untracked files, excluding the run folder, with JSON-safe paths and text/binary/symlink/other content. Its `--manifest` output is a mutation guard captured immediately before and after the reviewer call:
+Include `<CCC_HOME>/scripts/ccc-untracked.sh <repo_root> <output_folder> --prompt` in every code-review prompt when `CCC_REVIEW_DIFF_BUDGET=off`; otherwise `## Review Diff Budget` supplies the `git diff --cached`, `git diff`, and untracked content in one block. It lists non-ignored untracked files, excluding the run folder, with JSON-safe paths and text/binary/symlink/other content. Its `--manifest` output is a mutation guard captured immediately before and after the reviewer call:
 
 ```text
 <sha256|-> <size> <octal st_mode> <kind> <json-path>
@@ -450,6 +452,40 @@ git diff -- . ':(exclude)<output_folder>'
 ```
 
 To guard tracked and staged repository content, capture `git diff` and `git diff --cached` immediately before and after any code-review command. If the before/after outputs differ, stop with `Status: blocked`, report the mutation diff to the user, and require the user to restore or stash those changes before resuming.
+
+## Review Diff Budget
+
+Code-review prompts carry the change through `<CCC_HOME>/scripts/ccc-diff-summary.sh <repo_root> <output_folder> <run_start_ref> --auto --budget <B>`, where `<B>` is `CCC_REVIEW_DIFF_BUDGET` (UTF-8 bytes, default `60000`). This output replaces the `git diff --cached`, `git diff`, and `ccc-untracked.sh --prompt` blocks in the prompt; keep `git status --short` so staged and unstaged state stays visible. The mutation guard is unchanged.
+
+`CCC_REVIEW_DIFF_BUDGET=off` disables this section: use the separate `git diff --cached`, `git diff`, and untracked blocks from `## Git Review Baseline`.
+
+The script diffs the working tree against `run_start_ref`, tracked and untracked, excluding the run folder, and prints `diff_mode: full` or `diff_mode: tiered` first.
+
+* `full`: the whole diff fits the budget. Every file is shown in full. Nothing else changes.
+* `tiered`: `source` and `test` files are **always** shown in full, whatever their size; they are never summarized. `docs` and `generated` (lock, vendored, build, minified) files are shown in full, smallest first, while the running total stays within the budget. `binary` files are never expanded. Everything else becomes a `=== file summary ...` entry with `+adds -dels`, byte size, class, and its hunk headers. Classes come from path and extension; set `CCC_REVIEW_SOURCE_GLOBS` (colon-separated `fnmatch` patterns, for example `protocol/*:skills/*/SKILL.md`) when Markdown or config files are the product. Files print in path order.
+
+The budget counts raw diff bytes, not headers or summary lines. The prompt as a whole is still bounded by `CCC_REVIEW_PROMPT_MAX_BYTES`.
+
+For each summarized file, the reviewer reply must contain exactly one of:
+
+```text
+NEED <json-path>
+SKIP <json-path> — <reason>
+```
+
+A summarized file with neither line counts as `NEED`. If any file is `NEED`, the coordinator runs the script with `--hunks <json-path>...` and makes **one** follow-up call: the same prompt, the reviewer's first reply, the requested diffs, and `Give your final reply in the same format.` Log its size at `state/<stage>.prompt2.bytes`; the byte ceiling applies to it. Append both replies to the raw transcript, separated by `=== follow-up ===`. `NEED` lines in the follow-up reply are not served; those files stay unreviewed. Capture the mutation guard before the first call and after the last.
+
+`review_vN.md` `## Diff Baseline` then records:
+
+```text
+diff_mode: full|tiered
+skipped: none | <json-path>, ...
+unreviewed: none | <json-path>, ...
+```
+
+`skipped` lists summarized files the reviewer waived with `SKIP` (docs, generated, binary only). `unreviewed` lists any `source` or `test` file the reviewer never saw in full; the tiered rules above make it `none`, and it exists as a guard. When `unreviewed` is not `none`, no approval verdict is allowed (`APPROVE`, `APPROVE_WITH_MINOR_COMMENTS`, or `APPROVE_AUTO_OVERRIDE`); use `NEEDS_CHANGES` or `BLOCKER`.
+
+An in-session reviewer follows the same rules and may run `--hunks` directly instead of a follow-up call.
 
 ## Verdicts
 

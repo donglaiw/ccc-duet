@@ -73,6 +73,8 @@ When `<CCC_HOME>` cannot be resolved, CCC stops as `blocked`. It does not recons
 | `CCC_REVIEW_PROMPT_MAX_BYTES` | integer byte limit | Maximum UTF-8 byte length of a cross-agent review prompt. Default: `200000`. |
 | `CCC_CAVEMAN` | `off`, `lite`, `full`, `ultra` | Default caveman level when `caveman=...` is omitted on a new run. |
 | `CCC_CAVEMAN_SKILL` | absolute path | caveman `SKILL.md` to use instead of the installed one. |
+| `CCC_REVIEW_DIFF_BUDGET` | integer bytes, or `off` | Diff size above which code-review prompts switch to tiered mode (full diffs for top-priority files, summaries for the rest). Default: `60000`. |
+| `CCC_REVIEW_SOURCE_GLOBS` | colon-separated `fnmatch` patterns | Paths that tiered review must treat as source (for repos whose product is Markdown or config). |
 | `CCC_HOME` | absolute path | Directory holding `protocol/CCC_PROTOCOL.md` and `scripts/`. Overrides skill-directory resolution; useful when the skills are installed as copies but you want them to track a checkout. |
 
 Values are case-sensitive. Invalid values are treated as absent.
@@ -125,6 +127,8 @@ Most savings are structural and always on: finding and question IDs make review 
 Prose compression is **opt-in**. `caveman=lite|full|ultra` applies the [caveman](https://github.com/JuliusBrussee/caveman) skill to plan, code-summary, and review artifacts, cross-agent prompts, and reviewer replies. The default is `caveman=off` because compressed prose can degrade model reasoning and drop nuance, and CCC optimizes for plan and code quality first. Raw transcripts, `task.md`, `run.md`, code, comments, repository docs, and messages to the user are never compressed. Caveman's own guidance keeps persisted files in normal prose; CCC deliberately overrides that only for its own agent-to-agent artifacts, and only when a run opts in.
 
 `scripts/ccc-install.sh` installs caveman's `skills/caveman/SKILL.md` pinned by commit and SHA-256 and writes a `.ccc-pin` record; `scripts/ccc-check-install.sh` reports it and flags a modified pinned copy. A failed download only warns, since `caveman=off` runs do not need it; a run that asks for a level without the skill blocks at start. Bumping the pin means reviewing upstream and updating `CAVEMAN_REF` and `CAVEMAN_SHA256` together.
+
+Large diffs are budgeted (`scripts/ccc-diff-summary.sh`, `CCC_REVIEW_DIFF_BUDGET`, default 60000 raw diff bytes). Under the budget the reviewer sees every file in full, so small changes are unaffected. Over it, source and test files are still always shown in full; only docs, generated/lock/vendored files, and binaries can be reduced to stats plus hunk headers. The reviewer must `NEED` or `SKIP` each summarized file, and `NEED` is served in one follow-up call. This keeps review quality for code intact: the savings come only from files where a line-by-line read rarely finds bugs. A validator guard refuses any approval verdict if a source or test file is recorded as `unreviewed`. Repositories whose product is Markdown or config mark those paths as source with `CCC_REVIEW_SOURCE_GLOBS`.
 
 Code reviews also include a deterministic untracked-file block (`scripts/ccc-untracked.sh`); its manifest (SHA, size, `st_mode`, kind) is compared before and after the reviewer runs, so content, permission, or type changes to new files block the run.
 

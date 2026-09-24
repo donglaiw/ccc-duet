@@ -46,6 +46,7 @@ Do not write `.done`.
 * Use the code-review prompt template from `<CCC_HOME>/protocol/CCC_PROTOCOL.md`.
 * Tell the reviewer to evaluate only the artifacts and diffs included in the prompt, without inspecting other repository files.
 * For Codex reviewer commands, do not pass `--dangerously-bypass-approvals-and-sandbox`.
+* Carry the diff via `<CCC_HOME>/scripts/ccc-diff-summary.sh` per protocol `## Review Diff Budget` (unless `CCC_REVIEW_DIFF_BUDGET=off`). In `tiered` mode require `NEED`/`SKIP` per summarized file, serve `NEED` with one follow-up call, record `diff_mode:`, `skipped:`, and `unreviewed:` in `## Diff Baseline`; source/test files are never summarized, and any unreviewed source/test file forbids every approval verdict.
 * Verify `HEAD == run_start_ref`; include excluded status/cached/unstaged diffs, empty-tree fallback, and `<CCC_HOME>/scripts/ccc-untracked.sh ... --prompt`. Capture `--manifest` plus tracked/staged diffs before/after; any change blocks.
 * Inspect the actual git diff using the `run_start_ref` from `run.md`.
 * Do not trust `code_vN.md` alone.

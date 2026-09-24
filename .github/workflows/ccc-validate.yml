@@ -22,6 +22,7 @@ jobs:
           bash -n scripts/ccc-check-install.sh
           bash -n scripts/ccc-protocol-sections.sh
           bash -n scripts/ccc-untracked.sh
+          bash -n scripts/ccc-diff-summary.sh
           scripts/ccc-validate.sh examples/runs/hello-world
           scripts/ccc-validate.sh examples/runs/hello-world-codex-session
           scripts/ccc-validate.sh examples/runs/hello-world-auto-override
